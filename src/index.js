@@ -1,8 +1,9 @@
 import { GraphQLServer } from "graphql-yoga";
+import uuidv4 from "uuid/v4";
 // const { GraphQLServer } = require("graphql-yoga");
 
 //demo user data
-const users = [
+let users = [
   {
     id: "1",
     name: "maekkir",
@@ -33,7 +34,7 @@ const users = [
   }
 ];
 
-const posts = [
+let posts = [
   {
     id: "10",
     title: "GraphQL 101",
@@ -50,7 +51,7 @@ const posts = [
   }
 ];
 
-const comments = [
+let comments = [
   {
     id: "1",
     text: "test 1 ",
@@ -87,7 +88,33 @@ const typeDefs = `
 			posts(query:	String):	[Post!]!
 			comments(query: String) : [Comment!]!
 		}
+
+		type Mutation {
+			createUser(data:	CreateUserInput): User!
+			deleteUser(id:	ID!)	:User!
+			createPost(data:	CreatePostInput):	Post!
+			createComment(data:	CreateCommentInput)	:Comment!
+		}
 		
+		input	CreateUserInput {
+			name:	String!
+			email:	String!
+			age:	Int
+		}
+
+		input	CreatePostInput	{
+			title:	String!
+			body:	String!
+			published:	Boolean!
+			author:	ID!
+		}
+
+		input	CreateCommentInput	{
+			text:	String!
+			author:	ID!
+			post:	ID!
+		}
+
 		type User {
 			id:	ID!
 			name: String!
@@ -164,17 +191,96 @@ const resolvers = {
       });
     }
   },
+  Mutation: {
+    createUser(parent, args, ctx, info) {
+      const emailTaken = users.some(user => {
+        return user.email === args.email;
+      });
+
+      if (emailTaken) {
+        throw new Error("Email taken");
+      }
+
+      const user = {
+        id: uuidv4(),
+        ...args.data
+      };
+
+      users.push(user);
+
+      return user;
+    },
+    deleteUser(parent, args, ctx, info) {
+      const userIndex = users.findIndex(user => {
+        return user.id === args.id;
+      });
+
+      if (userIndex === -1) {
+        throw new Error("User	not	found");
+      }
+
+      const deleteuser = users.splice(userIndex, 1);
+
+      posts = posts.filter(post => {
+        const match = post.author === args.id;
+        if (match) {
+          comments = comments.filter(comment => {
+            return comment.post !== post.id;
+          });
+        }
+        return !match;
+      });
+
+      comments = comments.filter(comment => comment.author !== args.id);
+
+      return deleteuser[0];
+    },
+    createPost(parent, args, ctx, info) {
+      const userExits = users.some(user => user.id === args.data.author);
+
+      if (!userExits) {
+        throw new Error("User not Found");
+      }
+
+      const post = {
+        id: uuidv4(),
+        ...args.data
+      };
+
+      posts.push(post);
+
+      return post;
+    },
+    createComment(parent, args, ctx, info) {
+      const userExits = users.some(user => user.id === args.data.author);
+      const postExit = posts.some(
+        post => post.id === args.data.post && post.published
+      );
+
+      if (!userExits || !postExit) {
+        throw new Error("User or Post not Found");
+      }
+      const comment = {
+        id: uuidv4(),
+        ...args.data
+      };
+
+      comments.push(comment);
+
+      return comment;
+    }
+  },
   Post: {
     author(parent, args, ctx, info) {
       return users.find(user => {
         return user.id === parent.author;
       });
-		},
-		comments(parent , args , ctx , info)	{
-			return comments.filter((comments) => {
-				return comments.post === parent.id
-			})
-		}
+    },
+    comments(parent, args, ctx, info) {
+      return comments.filter(comments => {
+        return comments.post === parent.id;
+      });
+    }
   },
   User: {
     posts(parent, args, ctx, info) {
@@ -186,19 +292,19 @@ const resolvers = {
       return comments.filter(comment => {
         return comment.author === parent.id;
       });
-    },
+    }
   },
   Comment: {
     author(parent, args, ctx, info) {
-      return users.find((user) => {
+      return users.find(user => {
         return user.id === parent.author;
       });
     },
     post(parent, args, ctx, info) {
-			return posts.find((post) => {
-				return post.id === parent.post
-			})
-		}
+      return posts.find(post => {
+        return post.id === parent.post;
+      });
+    }
   }
 };
 
