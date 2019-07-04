@@ -1,5 +1,6 @@
 import { GraphQLServer } from "graphql-yoga";
 import uuidv4 from "uuid/v4";
+import { throws } from "assert";
 // const { GraphQLServer } = require("graphql-yoga");
 
 //demo user data
@@ -91,9 +92,11 @@ const typeDefs = `
 
 		type Mutation {
 			createUser(data:	CreateUserInput): User!
-			deleteUser(id:	ID!)	:User!
+			deleteUser(id:	ID!):	User!
 			createPost(data:	CreatePostInput):	Post!
+			deletePost(id:	ID!):	Post!
 			createComment(data:	CreateCommentInput)	:Comment!
+			deleteComment(id:	ID!): Comment!
 		}
 		
 		input	CreateUserInput {
@@ -235,6 +238,23 @@ const resolvers = {
 
       return deleteuser[0];
     },
+    deletePost(parent, args, ctx, info) {
+      const postIndex = posts.findIndex(post => {
+        return post.id === args.id;
+      });
+
+      if (postIndex == -1) {
+        throw new Error("Post	not	found");
+      }
+
+      const postDelete = posts.splice(postIndex, 1);
+
+      comments = comments.filter(comment => {
+        return	comment.post !== args.id
+			});
+			
+			return postDelete[0];
+    },
     createPost(parent, args, ctx, info) {
       const userExits = users.some(user => user.id === args.data.author);
 
@@ -268,7 +288,20 @@ const resolvers = {
       comments.push(comment);
 
       return comment;
-    }
+		},
+		deleteComment(parent , args , ctx , info ){
+			const commentIndex = comments.findIndex(comment => {
+				return comment.id === args.id
+			})
+			
+			if (!commentIndex === -1) {
+				throw new Error('Comment not found')
+			}
+
+			const deleteComment = comments.splice(commentIndex , 1)
+
+			return deleteComment[0]
+		}
   },
   Post: {
     author(parent, args, ctx, info) {
