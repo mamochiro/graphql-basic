@@ -1,4 +1,5 @@
 import uuidv4 from "uuid/v4";
+import { PubSub } from "graphql-yoga";
 
 const Mutation = {
   createUser(parent, args, { db }, info) {
@@ -61,7 +62,7 @@ const Mutation = {
 
     return postDelete[0];
   },
-  createPost(parent, args, { db }, info) {
+  createPost(parent, args, { db , pubsub }, info) {
     const userExits = db.users.some(user => user.id === args.data.author);
 
     if (!userExits) {
@@ -74,6 +75,10 @@ const Mutation = {
     };
 
     db.posts.push(post);
+
+    if(args.data.published){
+      pubsub.publish('post' , { post } )
+    }
 
     return post;
   },
@@ -99,7 +104,7 @@ const Mutation = {
 
     return post;
   },
-  createComment(parent, args, { db }, info) {
+  createComment(parent, args, { db , pubsub }, info) {
     const userExits = db.users.some(user => user.id === args.data.author);
     const postExit = db.posts.some(
       post => post.id === args.data.post && post.published
@@ -112,14 +117,13 @@ const Mutation = {
       id: uuidv4(),
       ...args.data
     };
-
+    
     db.comments.push(comment);
-
+    pubsub.publish(`comment ${args.data.post}`, { comment })
     return comment;
   },
   updateUser(parent, args, { db }, info) {
     const { id, data } = args;
-    console.log(data);
 
     const user = db.users.find(user => user.id === id);
 
